@@ -1,0 +1,15 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# env
+.env
+
+# ide
+.idea/
+.vscode/
