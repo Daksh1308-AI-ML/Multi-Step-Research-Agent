@@ -9,6 +9,9 @@ class Settings(BaseSettings):
 
     tavily_api_key: str = ""
 
+    # PostgreSQL connection for LangGraph checkpointing. Empty -> in-memory.
+    database_url: str = ""
+
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"

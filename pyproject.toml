@@ -9,6 +9,7 @@ description = "Production-grade multi-step research agent (LangGraph + DeepSeek 
 requires-python = ">=3.11"
 dependencies = [
     "langgraph>=0.2.0",
+    "langgraph-checkpoint-postgres>=3.1.0",
     "langchain-openai>=0.2.0",
     "langchain-core>=0.3.0",
     "httpx>=0.27.0",
@@ -16,6 +17,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "pydantic-settings>=2.0.0",
     "langfuse>=3.0.0",
+    "psycopg-binary>=3.2.0",
 ]
 
 [project.optional-dependencies]

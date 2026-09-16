@@ -8,7 +8,7 @@ import json
 import time
 
 from .config import settings
-from .graph import build_graph
+from .graph import _checkpointer, build_graph
 from .state import initial_state
 from .tracing import research_trace
 
@@ -32,7 +32,6 @@ async def stream_research(query: str, thread_id: str = "local"):
     chunks); when it fires, the graph iterator is closed so remaining nodes
     never execute and a final `error` event is emitted.
     """
-    graph = build_graph()
     deadline = time.monotonic() + settings.request_timeout
     result: dict = {}
     timed_out = False
@@ -43,43 +42,45 @@ async def stream_research(query: str, thread_id: str = "local"):
             "metadata": {"langfuse_session_id": thread_id},
             "callbacks": ctx.callbacks,
         }
-        it = graph.stream(initial_state(query), config, stream_mode="updates")
-        try:
-            for chunk in it:
-                if time.monotonic() >= deadline:
-                    timed_out = True
-                    break
-                for node, update in chunk.items():
-                    yield format_sse(
-                        "status", {"node": node, "stage": STAGES.get(node, node)}
-                    )
-                    if not update:
-                        continue
-                    result.update(update)
-                    if node == "planner":
+        with _checkpointer() as checkpointer:
+            graph = build_graph(checkpointer)
+            it = graph.stream(initial_state(query), config, stream_mode="updates")
+            try:
+                for chunk in it:
+                    if time.monotonic() >= deadline:
+                        timed_out = True
+                        break
+                    for node, update in chunk.items():
                         yield format_sse(
-                            "progress", {"sub_questions": update.get("plan") or []}
+                            "status", {"node": node, "stage": STAGES.get(node, node)}
                         )
-                    elif node == "searcher":
-                        yield format_sse(
-                            "progress",
-                            {"results_found": len(update.get("results") or [])},
-                        )
-                    elif node == "cite":
-                        for citation in update.get("citations") or []:
-                            yield format_sse("citation", citation)
-                    if "total_cost" in update:
-                        yield format_sse(
-                            "cost",
-                            {
-                                "total_cost": update["total_cost"],
-                                "cost_usd": round(update["total_cost"], 6),
-                            },
-                        )
-        except Exception as e:
-            yield format_sse("error", {"error": str(e), "status": "error"})
-        finally:
-            it.close()
+                        if not update:
+                            continue
+                        result.update(update)
+                        if node == "planner":
+                            yield format_sse(
+                                "progress", {"sub_questions": update.get("plan") or []}
+                            )
+                        elif node == "searcher":
+                            yield format_sse(
+                                "progress",
+                                {"results_found": len(update.get("results") or [])},
+                            )
+                        elif node == "cite":
+                            for citation in update.get("citations") or []:
+                                yield format_sse("citation", citation)
+                        if "total_cost" in update:
+                            yield format_sse(
+                                "cost",
+                                {
+                                    "total_cost": update["total_cost"],
+                                    "cost_usd": round(update["total_cost"], 6),
+                                },
+                            )
+            except Exception as e:
+                yield format_sse("error", {"error": str(e), "status": "error"})
+            finally:
+                it.close()
 
         if timed_out:
             yield format_sse(
